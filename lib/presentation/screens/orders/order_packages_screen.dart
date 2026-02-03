@@ -6,6 +6,8 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/order_package_item.dart';
 import '../../../data/models/package_type.dart';
 import '../../providers.dart';
+import '../../widgets/app_bar_logo.dart';
+import '../../widgets/app_bar_title.dart';
 import 'orders_list_screen.dart';
 
 class OrderPackagesState {
@@ -20,6 +22,28 @@ class OrderPackagesState {
   final List<OrderPackageItem> items;
 
   double get total => items.fold(0, (sum, item) => sum + item.lineTotal);
+
+  double get totalPackedGrams {
+    double sum = 0;
+    for (final item in items) {
+      final grams = packageTypes
+              .firstWhere(
+                (type) => type.id == item.packageTypeId,
+                orElse: () => PackageType(
+                  id: item.packageTypeId,
+                  name: 'Empaque #${item.packageTypeId}',
+                  price: item.unitPriceSnapshot,
+                  gramsPerPackage: 0,
+                  isActive: false,
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              )
+              .gramsPerPackage;
+      sum += item.quantity * grams;
+    }
+    return sum;
+  }
 }
 
 class OrderPackagesController
@@ -93,11 +117,108 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
     super.initState();
     ref.listenManual(orderPackagesProvider(widget.orderId), (previous, next) {
       next.whenOrNull(data: (data) {
-        for (final item in data.items) {
-          _quantities[item.packageTypeId] = item.quantity;
+        final nextQuantities = <int, int>{
+          for (final item in data.items) item.packageTypeId: item.quantity,
+        };
+        for (final type in data.activePackageTypes) {
+          nextQuantities.putIfAbsent(type.id!, () => 0);
         }
+        _quantities
+          ..clear()
+          ..addAll(nextQuantities);
       });
     }, fireImmediately: true);
+  }
+
+  OrderPackageItem? _findItem(
+    OrderPackagesState data,
+    int packageTypeId,
+  ) {
+    for (final item in data.items) {
+      if (item.packageTypeId == packageTypeId) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  double _resolveGrams(PackageType type) {
+    if (type.gramsPerPackage > 0) {
+      return type.gramsPerPackage;
+    }
+    final match =
+        RegExp(r'(\\d+(?:[\\.,]\\d+)?)\\s*(kg|g|lb)?', caseSensitive: false)
+            .firstMatch(type.name);
+    if (match == null) {
+      return 0;
+    }
+    final value = double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
+    if (value <= 0) {
+      return 0;
+    }
+    final unit = match.group(2)?.toLowerCase();
+    if (unit == 'kg') {
+      return value * 1000;
+    }
+    if (unit == 'lb') {
+      return value * 500;
+    }
+    return value;
+  }
+
+  double _calculatePackedGrams(OrderPackagesState data) {
+    double sum = 0;
+    for (final entry in _quantities.entries) {
+      final type = data.packageTypes.firstWhere(
+        (type) => type.id == entry.key,
+        orElse: () => PackageType(
+          id: entry.key,
+          name: 'Empaque #${entry.key}',
+          price: 0,
+          gramsPerPackage: 0,
+          isActive: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      sum += entry.value * _resolveGrams(type);
+    }
+    return sum;
+  }
+
+  Future<void> _applyQuantity(
+    OrderPackagesState data,
+    PackageType type,
+    int newQuantity,
+  ) async {
+    final typeId = type.id!;
+    final clamped = newQuantity.clamp(0, 999) as int;
+    final current = _quantities[typeId] ?? 0;
+    if (clamped == current) {
+      return;
+    }
+
+    setState(() {
+      _quantities[typeId] = clamped;
+    });
+
+    final notifier = ref.read(orderPackagesProvider(widget.orderId).notifier);
+    final existingItem = _findItem(data, typeId);
+
+    if (clamped <= 0) {
+      if (existingItem != null) {
+        await notifier.deleteItem(existingItem.id!);
+        ref.invalidate(ordersProvider);
+        ref.invalidate(orderTotalProvider(widget.orderId));
+        ref.invalidate(overviewProvider);
+      }
+      return;
+    }
+
+    await notifier.upsertItem(type, clamped);
+    ref.invalidate(ordersProvider);
+    ref.invalidate(orderTotalProvider(widget.orderId));
+    ref.invalidate(overviewProvider);
   }
 
   @override
@@ -106,20 +227,29 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Empaques del pedido'),
+        title: const AppBarTitle(subtitle: 'Empaques del pedido'),
+        leading: const AppBarLogo(),
+        leadingWidth: 96,
       ),
       body: packagesAsync.when(
         data: (data) {
+          final packedGrams = _calculatePackedGrams(data);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Text(
+                'Total empacado: ${Formatters.grams.format(packedGrams.round())} g',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
               Text(
                 'Tipos de empaque activos',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
               ...data.activePackageTypes.map((type) {
-                final quantity = _quantities[type.id] ?? 0;
+                final typeId = type.id!;
+                final quantity = _quantities[typeId] ?? 0;
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -135,10 +265,7 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                           children: [
                             IconButton(
                               onPressed: () {
-                                setState(() {
-                                  _quantities[type.id!] =
-                                      (quantity - 1).clamp(0, 999);
-                                });
+                                _applyQuantity(data, type, quantity - 1);
                               },
                               icon: const Icon(Icons.remove_circle_outline),
                             ),
@@ -146,33 +273,9 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                                 style: Theme.of(context).textTheme.titleMedium),
                             IconButton(
                               onPressed: () {
-                                setState(() {
-                                  _quantities[type.id!] =
-                                      (quantity + 1).clamp(0, 999);
-                                });
+                                _applyQuantity(data, type, quantity + 1);
                               },
                               icon: const Icon(Icons.add_circle_outline),
-                            ),
-                            const Spacer(),
-                            FilledButton(
-                              onPressed: () async {
-                                if (quantity <= 0) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Define una cantidad mayor a 0.',
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                await ref
-                                    .read(orderPackagesProvider(widget.orderId)
-                                        .notifier)
-                                    .upsertItem(type, quantity);
-                                ref.invalidate(ordersProvider);
-                              },
-                              child: const Text('Agregar/Actualizar'),
                             ),
                           ],
                         ),
@@ -196,6 +299,7 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                       id: item.packageTypeId,
                       name: 'Empaque #${item.packageTypeId}',
                       price: item.unitPriceSnapshot,
+                      gramsPerPackage: 0,
                       isActive: false,
                       createdAt: DateTime.now(),
                       updatedAt: DateTime.now(),
@@ -213,6 +317,8 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                                 orderPackagesProvider(widget.orderId).notifier)
                             .deleteItem(item.id!);
                         ref.invalidate(ordersProvider);
+                        ref.invalidate(orderTotalProvider(widget.orderId));
+                        ref.invalidate(overviewProvider);
                       },
                       icon: const Icon(Icons.delete_outline),
                     ),
@@ -230,7 +336,7 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                 onPressed: () =>
                     context.go('/orders/${widget.orderId}/checkout'),
                 icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Ir a checkout'),
+                label: const Text('Ir a liquidación'),
               ),
             ],
           );

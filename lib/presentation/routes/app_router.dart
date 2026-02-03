@@ -8,13 +8,18 @@ import '../screens/orders/order_detail_screen.dart';
 import '../screens/orders/order_form_screen.dart';
 import '../screens/orders/order_packages_screen.dart';
 import '../screens/orders/orders_list_screen.dart';
+import '../screens/splash_screen.dart';
 import '../screens/settings/package_type_form_screen.dart';
 import '../screens/settings/package_types_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/orders',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) => HomeShell(child: child),
         routes: [
@@ -37,6 +42,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   return OrderDetailScreen(orderId: orderId);
                 },
                 routes: [
+                  GoRoute(
+                    path: 'edit',
+                    builder: (context, state) {
+                      final orderId = int.parse(state.pathParameters['id']!);
+                      return OrderFormScreen(orderId: orderId);
+                    },
+                  ),
                   GoRoute(
                     path: 'packages',
                     builder: (context, state) {

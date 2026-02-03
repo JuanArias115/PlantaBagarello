@@ -8,11 +8,23 @@ class OrderListItem {
     required this.order,
     required this.total,
     required this.hasPackages,
+    required this.packedGrams,
   });
 
   final CoffeeOrder order;
   final double total;
   final bool hasPackages;
+  final double packedGrams;
+
+  bool get isPackingComplete {
+    final requiredGrams = order.lotKg * 1000;
+    if (requiredGrams <= 0) {
+      return true;
+    }
+    return packedGrams >= requiredGrams;
+  }
+
+  bool get isPendingPackaging => !isPackingComplete;
 }
 
 class CoffeeOrderRepository {
@@ -30,9 +42,11 @@ class CoffeeOrderRepository {
     final db = await _databaseService.database;
     final results = await db.rawQuery('''
       SELECT o.*, IFNULL(SUM(i.quantity * i.unit_price_snapshot), 0) AS total,
-      COUNT(i.id) AS item_count
+      COUNT(i.id) AS item_count,
+      IFNULL(SUM(i.quantity * IFNULL(p.grams_per_package, 0)), 0) AS packed_grams
       FROM coffee_orders o
       LEFT JOIN order_package_items i ON i.order_id = o.id
+      LEFT JOIN package_types p ON p.id = i.package_type_id
       GROUP BY o.id
       ORDER BY o.arrival_date ASC
     ''');
@@ -42,6 +56,7 @@ class CoffeeOrderRepository {
               order: CoffeeOrder.fromMap(row),
               total: (row['total'] as num).toDouble(),
               hasPackages: (row['item_count'] as int) > 0,
+              packedGrams: (row['packed_grams'] as num?)?.toDouble() ?? 0,
             ))
         .toList();
   }

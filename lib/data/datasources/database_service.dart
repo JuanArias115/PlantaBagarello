@@ -9,7 +9,7 @@ class DatabaseService {
 
   static final DatabaseService instance = DatabaseService._();
   static const _dbName = 'planta_bagarello.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   Database? _database;
 
@@ -57,6 +57,7 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         price REAL NOT NULL,
+        grams_per_package REAL NOT NULL DEFAULT 0,
         is_active INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
@@ -89,6 +90,13 @@ class DatabaseService {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 1) {
       await _onCreate(db, newVersion);
+      return;
+    }
+    if (oldVersion < 2) {
+      await db.execute(
+        'ALTER TABLE package_types '
+        'ADD COLUMN grams_per_package REAL NOT NULL DEFAULT 0',
+      );
     }
   }
 }

@@ -3,29 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../providers.dart';
-
-final overviewProvider = FutureProvider<OverviewData>((ref) async {
-  final repo = ref.watch(coffeeOrderRepositoryProvider);
-  final orders = await repo.fetchOrdersWithTotals();
-  final total = orders.fold(0.0, (sum, item) => sum + item.total);
-  return OverviewData(
-    totalOrders: orders.length,
-    totalRevenue: total,
-    pendingPackages: orders.where((item) => !item.hasPackages).length,
-  );
-});
-
-class OverviewData {
-  OverviewData({
-    required this.totalOrders,
-    required this.totalRevenue,
-    required this.pendingPackages,
-  });
-
-  final int totalOrders;
-  final double totalRevenue;
-  final int pendingPackages;
-}
+import '../../widgets/app_bar_logo.dart';
+import '../../widgets/app_bar_title.dart';
 
 class OverviewScreen extends ConsumerWidget {
   const OverviewScreen({super.key});
@@ -36,7 +15,9 @@ class OverviewScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Resumen'),
+        title: const AppBarTitle(subtitle: 'Resumen mensual'),
+        leading: const AppBarLogo(),
+        leadingWidth: 96,
       ),
       body: overviewAsync.when(
         data: (data) => Padding(
@@ -49,21 +30,15 @@ class OverviewScreen extends ConsumerWidget {
                 runSpacing: 16,
                 children: [
                   _SummaryCard(
-                    title: 'Pedidos registrados',
+                    title: 'Pedidos del mes',
                     value: data.totalOrders.toString(),
                     icon: Icons.local_cafe,
                     isWide: isWide,
                   ),
                   _SummaryCard(
-                    title: 'Total estimado',
+                    title: 'Total empacado del mes',
                     value: Formatters.money.format(data.totalRevenue),
                     icon: Icons.attach_money,
-                    isWide: isWide,
-                  ),
-                  _SummaryCard(
-                    title: 'Pendientes de empaques',
-                    value: data.pendingPackages.toString(),
-                    icon: Icons.shopping_bag,
                     isWide: isWide,
                   ),
                 ],

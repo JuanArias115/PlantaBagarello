@@ -8,6 +8,9 @@ import '../../../data/models/coffee_order.dart';
 import '../../../data/models/order_package_item.dart';
 import '../../../data/models/package_type.dart';
 import '../../providers.dart';
+import '../../widgets/app_bar_logo.dart';
+import '../../widgets/app_bar_title.dart';
+import 'orders_list_screen.dart';
 
 class OrderCheckoutState {
   OrderCheckoutState({
@@ -46,18 +49,27 @@ class OrderCheckoutScreen extends ConsumerWidget {
   final int orderId;
 
   Future<void> _sendWhatsApp(
-      BuildContext context, OrderCheckoutState data) async {
-    final phone = PhoneUtils.normalize(data.order.customerPhone);
-    final text = _buildReceipt(data);
+    BuildContext context,
+    WidgetRef ref,
+    String rawPhone,
+    String text,
+  ) async {
+    final phone = PhoneUtils.normalize(rawPhone);
     final uri = Uri.parse(
       'https://wa.me/${phone.replaceAll('+', '')}?text=${Uri.encodeComponent(text)}',
     );
 
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    final launched =
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo abrir WhatsApp.')),
       );
+      return;
     }
+
+    ref.invalidate(ordersProvider);
+    ref.invalidate(overviewProvider);
   }
 
   String _buildReceipt(OrderCheckoutState data) {
@@ -84,6 +96,7 @@ class OrderCheckoutScreen extends ConsumerWidget {
             id: item.packageTypeId,
             name: 'Empaque #${item.packageTypeId}',
             price: item.unitPriceSnapshot,
+            gramsPerPackage: 0,
             isActive: false,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -105,13 +118,16 @@ class OrderCheckoutScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Resumen y checkout'),
+        title: const AppBarTitle(subtitle: 'Liquidación'),
+        leading: const AppBarLogo(),
+        leadingWidth: 96,
       ),
       body: checkoutAsync.when(
         data: (data) {
           if (data == null) {
             return const Center(child: Text('Pedido no encontrado.'));
           }
+          final message = _buildReceipt(data);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -135,8 +151,9 @@ class OrderCheckoutScreen extends ConsumerWidget {
                           'Lote: ${Formatters.kg.format(data.order.lotKg)} kg'),
                       Text('Tueste: ${data.order.roastType}'),
                       Text('Molido: ${data.order.grindType}'),
-                      if (data.order.observation != null)
-                        Text('Observación: ${data.order.observation}'),
+                      Text(
+                        'Observación: ${data.order.observation ?? 'Sin observación'}',
+                      ),
                     ],
                   ),
                 ),
@@ -152,15 +169,16 @@ class OrderCheckoutScreen extends ConsumerWidget {
                 ...data.items.map((item) {
                   final type = data.packageTypes.firstWhere(
                     (type) => type.id == item.packageTypeId,
-                    orElse: () => PackageType(
-                      id: item.packageTypeId,
-                      name: 'Empaque #${item.packageTypeId}',
-                      price: item.unitPriceSnapshot,
-                      isActive: false,
-                      createdAt: DateTime.now(),
-                      updatedAt: DateTime.now(),
-                    ),
-                  );
+                  orElse: () => PackageType(
+                    id: item.packageTypeId,
+                    name: 'Empaque #${item.packageTypeId}',
+                    price: item.unitPriceSnapshot,
+                    gramsPerPackage: 0,
+                    isActive: false,
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  ),
+                );
                   return ListTile(
                     title: Text(type.name),
                     subtitle: Text(
@@ -170,6 +188,21 @@ class OrderCheckoutScreen extends ConsumerWidget {
                   );
                 }),
               const SizedBox(height: 16),
+              Text(
+                'Mensaje de WhatsApp',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SelectableText(
+                    message,
+                    textAlign: TextAlign.justify,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               Card(
                 child: ListTile(
                   title: const Text('Total final'),
@@ -178,7 +211,12 @@ class OrderCheckoutScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: () => _sendWhatsApp(context, data),
+                onPressed: () => _sendWhatsApp(
+                  context,
+                  ref,
+                  data.order.customerPhone,
+                  message,
+                ),
                 icon: const Icon(Icons.phone),
                 label: const Text('Enviar por WhatsApp'),
               ),

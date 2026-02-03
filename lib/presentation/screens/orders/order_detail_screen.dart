@@ -3,25 +3,55 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/formatters.dart';
-import '../../../data/models/coffee_order.dart';
 import '../../providers.dart';
-
-final orderDetailProvider =
-    FutureProvider.family<CoffeeOrder?, int>((ref, orderId) async {
-  final repo = ref.watch(coffeeOrderRepositoryProvider);
-  return repo.fetchById(orderId);
-});
-
-final orderTotalProvider =
-    FutureProvider.family<double, int>((ref, orderId) async {
-  final repo = ref.watch(coffeeOrderRepositoryProvider);
-  return repo.fetchOrderTotal(orderId);
-});
+import '../../widgets/app_bar_logo.dart';
+import '../../widgets/app_bar_title.dart';
+import 'orders_list_screen.dart';
 
 class OrderDetailScreen extends ConsumerWidget {
   const OrderDetailScreen({super.key, required this.orderId});
 
   final int orderId;
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar pedido'),
+        content: const Text('¿Quieres eliminar este pedido y sus empaques?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    await ref.read(coffeeOrderRepositoryProvider).delete(orderId);
+    ref.invalidate(ordersProvider);
+    ref.invalidate(orderDetailProvider(orderId));
+    ref.invalidate(orderTotalProvider(orderId));
+
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Pedido eliminado.')),
+    );
+    context.go('/orders');
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,12 +60,24 @@ class OrderDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalle del pedido'),
+        title: const AppBarTitle(subtitle: 'Detalle del pedido'),
+        leading: const AppBarLogo(),
+        leadingWidth: 96,
         actions: [
+          IconButton(
+            onPressed: () => context.go('/orders/$orderId/edit'),
+            icon: const Icon(Icons.edit),
+            tooltip: 'Editar',
+          ),
           IconButton(
             onPressed: () => context.go('/orders/$orderId/packages'),
             icon: const Icon(Icons.shopping_bag),
             tooltip: 'Empaques',
+          ),
+          IconButton(
+            onPressed: () => _confirmDelete(context, ref),
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Eliminar',
           ),
         ],
       ),
@@ -68,10 +110,10 @@ class OrderDetailScreen extends ConsumerWidget {
                       ),
                       Text('Tueste: ${order.roastType}'),
                       Text('Molido: ${order.grindType}'),
-                      if (order.observation != null) ...[
-                        const SizedBox(height: 12),
-                        Text('Observación: ${order.observation}'),
-                      ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Observación: ${order.observation ?? 'Sin observación'}',
+                      ),
                     ],
                   ),
                 ),
@@ -91,13 +133,13 @@ class OrderDetailScreen extends ConsumerWidget {
               FilledButton.icon(
                 onPressed: () => context.go('/orders/$orderId/packages'),
                 icon: const Icon(Icons.shopping_bag),
-                label: const Text('Empaques / Checkout'),
+                label: const Text('Empaques / Liquidación'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () => context.go('/orders/$orderId/checkout'),
                 icon: const Icon(Icons.phone),
-                label: const Text('Resumen y WhatsApp'),
+                label: const Text('Liquidación y WhatsApp'),
               ),
             ],
           );

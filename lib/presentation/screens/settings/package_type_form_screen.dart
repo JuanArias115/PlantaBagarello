@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/models/package_type.dart';
 import '../../providers.dart';
+import '../../widgets/app_bar_logo.dart';
+import '../../widgets/app_bar_title.dart';
 import 'package_types_screen.dart';
 
 class PackageTypeFormScreen extends ConsumerStatefulWidget {
@@ -21,6 +23,7 @@ class _PackageTypeFormScreenState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
+  final _gramsController = TextEditingController();
   bool _isActive = true;
   bool _loaded = false;
 
@@ -28,6 +31,7 @@ class _PackageTypeFormScreenState
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _gramsController.dispose();
     super.dispose();
   }
 
@@ -41,6 +45,7 @@ class _PackageTypeFormScreenState
     if (packageType != null) {
       _nameController.text = packageType.name;
       _priceController.text = packageType.price.toStringAsFixed(0);
+      _gramsController.text = packageType.gramsPerPackage.toStringAsFixed(0);
       _isActive = packageType.isActive;
     }
     _loaded = true;
@@ -52,11 +57,13 @@ class _PackageTypeFormScreenState
     }
     final now = DateTime.now();
     final price = double.parse(_priceController.text.replaceAll(',', '.'));
+    final grams = double.parse(_gramsController.text.replaceAll(',', '.'));
 
     if (widget.packageTypeId == null) {
       final package = PackageType(
         name: _nameController.text.trim(),
         price: price,
+        gramsPerPackage: grams,
         isActive: _isActive,
         createdAt: now,
         updatedAt: now,
@@ -70,6 +77,7 @@ class _PackageTypeFormScreenState
         final updated = existing.copyWith(
           name: _nameController.text.trim(),
           price: price,
+          gramsPerPackage: grams,
           isActive: _isActive,
           updatedAt: now,
         );
@@ -89,9 +97,12 @@ class _PackageTypeFormScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.packageTypeId == null
-            ? 'Nuevo empaque'
-            : 'Editar empaque'),
+        title: AppBarTitle(
+          subtitle:
+              widget.packageTypeId == null ? 'Nuevo empaque' : 'Editar empaque',
+        ),
+        leading: const AppBarLogo(),
+        leadingWidth: 96,
       ),
       body: Form(
         key: _formKey,
@@ -109,6 +120,24 @@ class _PackageTypeFormScreenState
             TextFormField(
               controller: _priceController,
               decoration: const InputDecoration(labelText: 'Precio'),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              validator: (value) {
+                final text = value?.trim() ?? '';
+                if (text.isEmpty) {
+                  return 'Campo requerido';
+                }
+                final number = double.tryParse(text.replaceAll(',', '.'));
+                if (number == null || number <= 0) {
+                  return 'Debe ser mayor a 0';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _gramsController,
+              decoration: const InputDecoration(labelText: 'Gramaje (g)'),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               validator: (value) {

@@ -16,8 +16,10 @@ class _PlantaBagarelloAppState extends ConsumerState<PlantaBagarelloApp> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      ref.read(packageTypeRepositoryProvider).seedDefaultsIfEmpty();
+    Future.microtask(() async {
+      final repo = ref.read(packageTypeRepositoryProvider);
+      await repo.seedDefaultsIfEmpty();
+      await repo.syncGramsFromNames();
     });
   }
 
@@ -28,6 +30,7 @@ class _PlantaBagarelloAppState extends ConsumerState<PlantaBagarelloApp> {
       title: 'Planta Bagarello',
       theme: AppTheme.theme,
       routerConfig: router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }

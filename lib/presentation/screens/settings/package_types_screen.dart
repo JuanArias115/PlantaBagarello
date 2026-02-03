@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/package_type.dart';
 import '../../providers.dart';
+import '../../widgets/app_bar_logo.dart';
+import '../../widgets/app_bar_title.dart';
 
 final packageTypesProvider = FutureProvider<List<PackageType>>((ref) async {
   return ref.watch(packageTypeRepositoryProvider).fetchAll();
@@ -45,7 +47,9 @@ class PackageTypesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración de empaques'),
+        title: const AppBarTitle(subtitle: 'Configuración de empaques'),
+        leading: const AppBarLogo(),
+        leadingWidth: 96,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/settings/new'),

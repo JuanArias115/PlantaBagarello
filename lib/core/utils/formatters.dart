@@ -8,4 +8,5 @@ class Formatters {
     decimalDigits: 0,
   );
   static final NumberFormat kg = NumberFormat('0.00');
+  static final NumberFormat grams = NumberFormat.decimalPattern('es_CO');
 }

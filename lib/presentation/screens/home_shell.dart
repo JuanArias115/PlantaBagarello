@@ -7,7 +7,7 @@ class HomeShell extends StatelessWidget {
   final Widget child;
 
   static const List<_NavigationItem> _items = [
-    _NavigationItem(label: 'Resumen', icon: Icons.insights, location: '/overview'),
+    _NavigationItem(label: 'Resumen mensual', icon: Icons.insights, location: '/overview'),
     _NavigationItem(label: 'Pedidos', icon: Icons.local_cafe, location: '/orders'),
     _NavigationItem(label: 'Configuración', icon: Icons.settings, location: '/settings'),
   ];
