@@ -20,13 +20,13 @@ class OrderCheckoutState {
   final List<OrderPackageItem> items;
   final List<PackageType> packageTypes;
 
-  double get total =>
-      items.fold(0, (sum, item) => sum + item.lineTotal);
+  double get total => items.fold(0, (sum, item) => sum + item.lineTotal);
 }
 
 final orderCheckoutProvider =
     FutureProvider.family<OrderCheckoutState?, int>((ref, orderId) async {
-  final order = await ref.read(coffeeOrderRepositoryProvider).fetchById(orderId);
+  final order =
+      await ref.read(coffeeOrderRepositoryProvider).fetchById(orderId);
   if (order == null) {
     return null;
   }
@@ -45,7 +45,8 @@ class OrderCheckoutScreen extends ConsumerWidget {
 
   final int orderId;
 
-  Future<void> _sendWhatsApp(BuildContext context, OrderCheckoutState data) async {
+  Future<void> _sendWhatsApp(
+      BuildContext context, OrderCheckoutState data) async {
     final phone = PhoneUtils.normalize(data.order.customerPhone);
     final text = _buildReceipt(data);
     final uri = Uri.parse(
@@ -130,7 +131,8 @@ class OrderCheckoutScreen extends ConsumerWidget {
                         'Llegada: ${Formatters.arrivalDate.format(data.order.arrivalDate)}',
                       ),
                       const SizedBox(height: 8),
-                      Text('Lote: ${Formatters.kg.format(data.order.lotKg)} kg'),
+                      Text(
+                          'Lote: ${Formatters.kg.format(data.order.lotKg)} kg'),
                       Text('Tueste: ${data.order.roastType}'),
                       Text('Molido: ${data.order.grindType}'),
                       if (data.order.observation != null)
@@ -145,8 +147,7 @@ class OrderCheckoutScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              if (data.items.isEmpty)
-                const Text('Sin empaques registrados.'),
+              if (data.items.isEmpty) const Text('Sin empaques registrados.'),
               if (data.items.isNotEmpty)
                 ...data.items.map((item) {
                   final type = data.packageTypes.firstWhere(
@@ -165,8 +166,7 @@ class OrderCheckoutScreen extends ConsumerWidget {
                     subtitle: Text(
                       '${item.quantity} x ${Formatters.money.format(item.unitPriceSnapshot)}',
                     ),
-                    trailing:
-                        Text(Formatters.money.format(item.lineTotal)),
+                    trailing: Text(Formatters.money.format(item.lineTotal)),
                   );
                 }),
               const SizedBox(height: 16),
@@ -179,7 +179,7 @@ class OrderCheckoutScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: () => _sendWhatsApp(context, data),
-                icon: const Icon(Icons.whatsapp),
+                icon: const Icon(Icons.phone),
                 label: const Text('Enviar por WhatsApp'),
               ),
             ],

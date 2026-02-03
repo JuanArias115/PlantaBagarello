@@ -19,13 +19,13 @@ class OrderPackagesState {
   final List<PackageType> activePackageTypes;
   final List<OrderPackageItem> items;
 
-  double get total =>
-      items.fold(0, (sum, item) => sum + item.lineTotal);
+  double get total => items.fold(0, (sum, item) => sum + item.lineTotal);
 }
 
 class OrderPackagesController
     extends StateNotifier<AsyncValue<OrderPackagesState>> {
-  OrderPackagesController(this.ref, this.orderId) : super(const AsyncValue.loading()) {
+  OrderPackagesController(this.ref, this.orderId)
+      : super(const AsyncValue.loading()) {
     _load();
   }
 
@@ -36,10 +36,10 @@ class OrderPackagesController
     try {
       final packageTypes =
           await ref.read(packageTypeRepositoryProvider).fetchAll();
-      final activeTypes =
-          packageTypes.where((type) => type.isActive).toList();
-      final items =
-          await ref.read(orderPackageRepositoryProvider).fetchByOrderId(orderId);
+      final activeTypes = packageTypes.where((type) => type.isActive).toList();
+      final items = await ref
+          .read(orderPackageRepositoryProvider)
+          .fetchByOrderId(orderId);
       state = AsyncValue.data(OrderPackagesState(
         packageTypes: packageTypes,
         activePackageTypes: activeTypes,
@@ -69,7 +69,9 @@ class OrderPackagesController
 }
 
 final orderPackagesProvider = StateNotifierProvider.family<
-    OrderPackagesController, AsyncValue<OrderPackagesState>, int>((ref, orderId) {
+    OrderPackagesController,
+    AsyncValue<OrderPackagesState>,
+    int>((ref, orderId) {
   return OrderPackagesController(ref, orderId);
 });
 
@@ -79,7 +81,8 @@ class OrderPackagesScreen extends ConsumerStatefulWidget {
   final int orderId;
 
   @override
-  ConsumerState<OrderPackagesScreen> createState() => _OrderPackagesScreenState();
+  ConsumerState<OrderPackagesScreen> createState() =>
+      _OrderPackagesScreenState();
 }
 
 class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
@@ -88,13 +91,13 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
   @override
   void initState() {
     super.initState();
-    ref.listen(orderPackagesProvider(widget.orderId), (previous, next) {
+    ref.listenManual(orderPackagesProvider(widget.orderId), (previous, next) {
       next.whenOrNull(data: (data) {
         for (final item in data.items) {
           _quantities[item.packageTypeId] = item.quantity;
         }
       });
-    });
+    }, fireImmediately: true);
   }
 
   @override
@@ -164,7 +167,8 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                                   return;
                                 }
                                 await ref
-                                    .read(orderPackagesProvider(widget.orderId).notifier)
+                                    .read(orderPackagesProvider(widget.orderId)
+                                        .notifier)
                                     .upsertItem(type, quantity);
                                 ref.invalidate(ordersProvider);
                               },
@@ -183,8 +187,7 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              if (data.items.isEmpty)
-                const Text('Sin empaques registrados.'),
+              if (data.items.isEmpty) const Text('Sin empaques registrados.'),
               if (data.items.isNotEmpty)
                 ...data.items.map((item) {
                   final type = data.packageTypes.firstWhere(
@@ -206,7 +209,8 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                     trailing: IconButton(
                       onPressed: () async {
                         await ref
-                            .read(orderPackagesProvider(widget.orderId).notifier)
+                            .read(
+                                orderPackagesProvider(widget.orderId).notifier)
                             .deleteItem(item.id!);
                         ref.invalidate(ordersProvider);
                       },
@@ -223,7 +227,8 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: () => context.go('/orders/${widget.orderId}/checkout'),
+                onPressed: () =>
+                    context.go('/orders/${widget.orderId}/checkout'),
                 icon: const Icon(Icons.check_circle_outline),
                 label: const Text('Ir a checkout'),
               ),
