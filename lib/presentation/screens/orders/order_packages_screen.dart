@@ -84,17 +84,29 @@ class OrderPackagesScreen extends ConsumerStatefulWidget {
 
 class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
   final Map<int, int> _quantities = {};
+  ProviderSubscription<AsyncValue<OrderPackagesState>>? _packagesSubscription;
 
   @override
   void initState() {
     super.initState();
-    ref.listen(orderPackagesProvider(widget.orderId), (previous, next) {
-      next.whenOrNull(data: (data) {
-        for (final item in data.items) {
-          _quantities[item.packageTypeId] = item.quantity;
-        }
-      });
-    });
+    _packagesSubscription = ref.listenManual<AsyncValue<OrderPackagesState>>(
+      orderPackagesProvider(widget.orderId),
+      (previous, next) {
+        next.whenOrNull(data: (data) {
+          setState(() {
+            for (final item in data.items) {
+              _quantities[item.packageTypeId] = item.quantity;
+            }
+          });
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _packagesSubscription?.close();
+    super.dispose();
   }
 
   @override
