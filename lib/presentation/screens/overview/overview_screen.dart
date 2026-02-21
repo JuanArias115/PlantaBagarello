@@ -1,12 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../data/repositories/coffee_order_repository.dart';
 import '../../providers.dart';
 
 final overviewProvider = FutureProvider<OverviewData>((ref) async {
-  final repo = ref.watch(coffeeOrderRepositoryProvider);
-  final orders = await repo.fetchOrdersWithTotals();
+  final orders = await ref.watch(ordersWithTotalsProvider.future);
   final total = orders.fold(0.0, (sum, item) => sum + item.total);
   return OverviewData(
     totalOrders: orders.length,
@@ -37,6 +42,13 @@ class OverviewScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Resumen'),
+        actions: [
+          IconButton(
+            tooltip: 'Exportar reporte mensual PDF',
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: () => _exportMonthlyReport(context, ref),
+          ),
+        ],
       ),
       body: overviewAsync.when(
         data: (data) => Padding(
@@ -75,6 +87,107 @@ class OverviewScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
+  }
+
+  Future<void> _exportMonthlyReport(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
+
+    try {
+      final orders = await ref.read(ordersWithTotalsProvider.future);
+      final monthlyOrders = orders.where((item) {
+        final date = item.order.arrivalDate;
+        return date.year == now.year && date.month == now.month;
+      }).toList();
+
+      if (monthlyOrders.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('No hay pedidos en el mes actual para exportar.'),
+          ),
+        );
+        return;
+      }
+
+      final bytes = await _buildMonthlyReportPdf(
+        monthlyOrders: monthlyOrders,
+        generatedAt: now,
+      );
+
+      await Printing.layoutPdf(
+        name:
+            'reporte_mensual_${now.year}_${now.month.toString().padLeft(2, '0')}.pdf',
+        onLayout: (_) async => bytes,
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo generar el reporte mensual en PDF.'),
+        ),
+      );
+    }
+  }
+
+  Future<Uint8List> _buildMonthlyReportPdf({
+    required List<OrderListItem> monthlyOrders,
+    required DateTime generatedAt,
+  }) async {
+    final document = pw.Document();
+
+    final totalValue = monthlyOrders.fold<double>(
+      0,
+      (sum, item) => sum + item.total,
+    );
+
+    final monthLabel =
+        DateFormat('MMMM yyyy', 'es_CO').format(generatedAt).toUpperCase();
+
+    document.addPage(
+      pw.MultiPage(
+        build: (context) => [
+          pw.Text(
+            'Reporte mensual de clientes',
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text('Mes actual: $monthLabel'),
+          pw.Text('Registros: ${monthlyOrders.length}'),
+          pw.SizedBox(height: 12),
+          pw.TableHelper.fromTextArray(
+            headers: const ['Nombre', 'Fecha', 'Lote', 'Valor final'],
+            data: monthlyOrders
+                .map(
+                  (item) => [
+                    item.order.customerName,
+                    Formatters.arrivalDate.format(item.order.arrivalDate),
+                    '${Formatters.kg.format(item.order.lotKg)} kg',
+                    Formatters.money.format(item.total),
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellAlignments: {
+              1: pw.Alignment.centerLeft,
+              2: pw.Alignment.centerRight,
+              3: pw.Alignment.centerRight,
+            },
+          ),
+          pw.SizedBox(height: 12),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Total mes actual: ${Formatters.money.format(totalValue)}',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return document.save();
   }
 }
 

@@ -6,7 +6,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/order_package_item.dart';
 import '../../../data/models/package_type.dart';
 import '../../providers.dart';
-import 'orders_list_screen.dart';
+import 'order_detail_screen.dart';
 
 class OrderPackagesState {
   OrderPackagesState({
@@ -84,17 +84,29 @@ class OrderPackagesScreen extends ConsumerStatefulWidget {
 
 class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
   final Map<int, int> _quantities = {};
+  ProviderSubscription<AsyncValue<OrderPackagesState>>? _packagesSubscription;
 
   @override
   void initState() {
     super.initState();
-    ref.listen(orderPackagesProvider(widget.orderId), (previous, next) {
-      next.whenOrNull(data: (data) {
-        for (final item in data.items) {
-          _quantities[item.packageTypeId] = item.quantity;
-        }
-      });
-    });
+    _packagesSubscription = ref.listenManual<AsyncValue<OrderPackagesState>>(
+      orderPackagesProvider(widget.orderId),
+      (previous, next) {
+        next.whenOrNull(data: (data) {
+          setState(() {
+            for (final item in data.items) {
+              _quantities[item.packageTypeId] = item.quantity;
+            }
+          });
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _packagesSubscription?.close();
+    super.dispose();
   }
 
   @override
@@ -166,7 +178,8 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                                 await ref
                                     .read(orderPackagesProvider(widget.orderId).notifier)
                                     .upsertItem(type, quantity);
-                                ref.invalidate(ordersProvider);
+                                ref.invalidate(ordersWithTotalsProvider);
+                                ref.invalidate(orderTotalProvider(widget.orderId));
                               },
                               child: const Text('Agregar/Actualizar'),
                             ),
@@ -208,7 +221,8 @@ class _OrderPackagesScreenState extends ConsumerState<OrderPackagesScreen> {
                         await ref
                             .read(orderPackagesProvider(widget.orderId).notifier)
                             .deleteItem(item.id!);
-                        ref.invalidate(ordersProvider);
+                        ref.invalidate(ordersWithTotalsProvider);
+                        ref.invalidate(orderTotalProvider(widget.orderId));
                       },
                       icon: const Icon(Icons.delete_outline),
                     ),

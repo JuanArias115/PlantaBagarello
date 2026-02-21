@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/models/coffee_order.dart';
 import '../../providers.dart';
-import 'orders_list_screen.dart';
 
 class OrderFormScreen extends ConsumerStatefulWidget {
   const OrderFormScreen({super.key});
@@ -67,7 +66,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
     );
 
     await ref.read(coffeeOrderRepositoryProvider).insert(order);
-    ref.invalidate(ordersProvider);
+    ref.invalidate(ordersWithTotalsProvider);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

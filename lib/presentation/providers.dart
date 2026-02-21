@@ -20,3 +20,8 @@ final packageTypeRepositoryProvider = Provider<PackageTypeRepository>((ref) {
 final orderPackageRepositoryProvider = Provider<OrderPackageRepository>((ref) {
   return OrderPackageRepository(ref.watch(databaseServiceProvider));
 });
+
+final ordersWithTotalsProvider = FutureProvider<List<OrderListItem>>((ref) async {
+  final repo = ref.watch(coffeeOrderRepositoryProvider);
+  return repo.fetchOrdersWithTotals();
+});

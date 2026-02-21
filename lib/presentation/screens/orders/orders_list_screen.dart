@@ -3,21 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/formatters.dart';
-import '../../../data/repositories/coffee_order_repository.dart';
 import '../../providers.dart';
 import '../../widgets/responsive_grid.dart';
-
-final ordersProvider = FutureProvider<List<OrderListItem>>((ref) async {
-  final repo = ref.watch(coffeeOrderRepositoryProvider);
-  return repo.fetchOrdersWithTotals();
-});
 
 class OrdersListScreen extends ConsumerWidget {
   const OrdersListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ordersAsync = ref.watch(ordersProvider);
+    final ordersAsync = ref.watch(ordersWithTotalsProvider);
 
     return Scaffold(
       appBar: AppBar(
