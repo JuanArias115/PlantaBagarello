@@ -96,7 +96,7 @@ class OrderDetailScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () => context.go('/orders/$orderId/checkout'),
-                icon: const Icon(Icons.whatsapp),
+                icon: const Icon(Icons.phone),
                 label: const Text('Resumen y WhatsApp'),
               ),
             ],
