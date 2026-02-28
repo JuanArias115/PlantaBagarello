@@ -28,6 +28,7 @@ class _PlantaBagarelloAppState extends ConsumerState<PlantaBagarelloApp> {
       title: 'Planta Bagarello',
       theme: AppTheme.theme,
       routerConfig: router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }
